@@ -61,7 +61,7 @@ type TIngredientsResponse = TServerResponse<{
   data: TIngredient[];
 }>;
 
-type TFeedsResponse = TServerResponse<{
+export type TFeedsResponse = TServerResponse<{
   orders: TOrder[];
   total: number;
   totalToday: number;
@@ -115,6 +115,7 @@ type TNewOrder = {
   updatedAt: string;
   number: number;
   price: number;
+  ingredients: string[];
 };
 
 type TNewOrderResponse = TServerResponse<{
