@@ -1,34 +1,53 @@
-import { FC, useMemo } from 'react';
+import { FC, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Preloader } from '../ui/preloader';
 import { OrderInfoUI } from '../ui/order-info';
 import { TIngredient } from '@utils-types';
-import { useSelector } from '../../services/store';
+import { useDispatch, useSelector } from '../../services/store';
+import { getOrderByNumber } from '../../services/slices/orders';
 
 export const OrderInfo: FC = () => {
-  // Получаем номер заказа из URL (/feed/:number или /profile/orders/:number)
+  const dispatch = useDispatch();
   const { number } = useParams<{ number: string }>();
 
-  // Берём заказы и ингредиенты из стора
-  const orders = useSelector((state) => state.feed.orders) || [];
+  const feedOrders = useSelector((state) => state.feed.orders);
+  const userOrders = useSelector((state) => state.orders.orders);
+  const currentOrder = useSelector((state) => state.orders.currentOrder);
   const ingredients = useSelector((state) => state.ingredients.ingredients);
 
-  // Находим заказ по номеру
   const orderData = useMemo(
-    () => orders.find((order) => order.number === Number(number)),
-    [orders, number]
+    () =>
+      currentOrder ||
+      feedOrders.find((order) => order.number === Number(number)) ||
+      userOrders.find((order) => order.number === Number(number)) ||
+      null,
+    [currentOrder, feedOrders, userOrders, number]
   );
 
-  // Формируем данные для отображения
+  useEffect(() => {
+    if (!orderData && number) {
+      dispatch(getOrderByNumber(+number));
+    }
+  }, [dispatch, number, orderData]);
+
   const orderInfo = useMemo(() => {
-    if (!orderData || !ingredients.length) return null;
+    if (!orderData) return null;
+
+    if (!ingredients.length) {
+      return {
+        ...orderData,
+        ingredientsInfo: {},
+        date: new Date(orderData.createdAt),
+        total: 0
+      };
+    }
+
     const date = new Date(orderData.createdAt);
 
     type TIngredientsWithCount = {
       [key: string]: TIngredient & { count: number };
     };
 
-    // Подсчитываем количество каждого ингредиента в заказе
     const ingredientsInfo = orderData.ingredients.reduce<TIngredientsWithCount>(
       (acc, item) => {
         if (!acc[item]) {
@@ -44,7 +63,6 @@ export const OrderInfo: FC = () => {
       {}
     );
 
-    // Считаем общую стоимость
     const total = Object.values(ingredientsInfo).reduce<number>(
       (acc, item) => acc + item.price * item.count,
       0

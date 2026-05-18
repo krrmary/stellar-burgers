@@ -1,10 +1,13 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { TIngredient, TOrder } from '@utils-types';
 import { orderBurgerApi } from '../../utils/burger-api';
+import { v4 as uuidv4 } from 'uuid';
+
+export type TConstructorIngredient = TIngredient & { id: string };
 
 type ConstructorState = {
   bun: TIngredient | null;
-  ingredients: TIngredient[];
+  ingredients: TConstructorIngredient[];
   orderRequest: boolean;
   orderModalData: TOrder | null;
 };
@@ -20,16 +23,7 @@ export const submitOrder = createAsyncThunk(
   'constructor/submitOrder',
   async (ingredientsIds: string[]) => {
     const data = await orderBurgerApi(ingredientsIds);
-    return {
-      _id: data.order._id,
-      status: data.order.status,
-      name: data.order.name,
-      createdAt: data.order.createdAt,
-      updatedAt: data.order.updatedAt,
-      number: data.order.number,
-      ingredients: data.order.ingredients,
-      owner: data.order.owner
-    } as TOrder;
+    return data.order as unknown as TOrder;
   }
 );
 
@@ -37,20 +31,28 @@ const constructorSlice = createSlice({
   name: 'constructor',
   initialState,
   reducers: {
-    addBun: (state, action: { payload: TIngredient }) => {
+    addBun: (state, action: PayloadAction<TIngredient>) => {
       state.bun = action.payload;
     },
-    addIngredient: (state, action: { payload: TIngredient }) => {
-      state.ingredients.push(action.payload);
+    addIngredient: {
+      reducer: (state, action: PayloadAction<TConstructorIngredient>) => {
+        state.ingredients.push(action.payload);
+      },
+      prepare: (ingredient: TIngredient) => ({
+        payload: { ...ingredient, id: uuidv4() }
+      })
     },
-    removeIngredient: (state, action: { payload: TIngredient }) => {
+    removeIngredient: (
+      state,
+      action: PayloadAction<TConstructorIngredient>
+    ) => {
       state.ingredients = state.ingredients.filter(
-        (item) => item._id !== action.payload._id
+        (item) => item.id !== action.payload.id
       );
     },
     moveIngredient: (
       state,
-      action: { payload: { index: number; direction: 'up' | 'down' } }
+      action: PayloadAction<{ index: number; direction: 'up' | 'down' }>
     ) => {
       const { index, direction } = action.payload;
       if (direction === 'up' && index > 0) {
@@ -94,5 +96,4 @@ export const {
   moveIngredient,
   clearOrderModal
 } = constructorSlice.actions;
-
 export default constructorSlice.reducer;

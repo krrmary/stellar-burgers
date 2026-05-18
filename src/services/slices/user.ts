@@ -9,6 +9,7 @@ import {
   TRegisterData,
   updateUserApi
 } from '@api';
+import { setCookie } from '../../utils/cookie';
 
 export const getUser = createAsyncThunk(
   'user/getUser',
@@ -30,7 +31,8 @@ export const loginUser = createAsyncThunk(
   async (data: TLoginData, { rejectWithValue }) => {
     try {
       const response = await loginUserApi(data);
-      // Токены уже сохранены внутри API через setCookie/localStorage
+      setCookie('accessToken', response.accessToken);
+      localStorage.setItem('refreshToken', response.refreshToken);
       return response.user;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Ошибка входа');
@@ -43,6 +45,8 @@ export const registerUser = createAsyncThunk(
   async (data: TRegisterData, { rejectWithValue }) => {
     try {
       const response = await registerUserApi(data);
+      setCookie('accessToken', response.accessToken);
+      localStorage.setItem('refreshToken', response.refreshToken);
       return response.user;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Ошибка регистрации');
@@ -55,7 +59,6 @@ export const logoutUser = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await logoutApi();
-      // Очищаем refreshToken, accessToken удалится через cookie
       localStorage.removeItem('refreshToken');
       return;
     } catch (error: any) {
@@ -102,13 +105,11 @@ export const userSlice = createSlice({
       .addCase(getUser.rejected, (state, action) => {
         state.isAuthChecked = true;
         state.user = null;
-        // Если ошибка "не авторизован" — не показываем её как критическую
         state.error =
           action.payload === 'not_authenticated'
             ? null
             : (action.payload as string);
       })
-
       .addCase(loginUser.fulfilled, (state, action) => {
         state.user = action.payload;
         state.error = null;
@@ -116,7 +117,6 @@ export const userSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.error = (action.payload as string) || 'Ошибка входа';
       })
-
       .addCase(registerUser.fulfilled, (state, action) => {
         state.user = action.payload;
         state.error = null;
@@ -124,7 +124,6 @@ export const userSlice = createSlice({
       .addCase(registerUser.rejected, (state, action) => {
         state.error = (action.payload as string) || 'Ошибка регистрации';
       })
-
       .addCase(updateUser.fulfilled, (state, action) => {
         state.user = action.payload;
         state.error = null;
@@ -132,7 +131,6 @@ export const userSlice = createSlice({
       .addCase(updateUser.rejected, (state, action) => {
         state.error = (action.payload as string) || 'Ошибка обновления данных';
       })
-
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
         state.isAuthChecked = true;
