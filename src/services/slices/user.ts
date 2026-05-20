@@ -9,7 +9,7 @@ import {
   TRegisterData,
   updateUserApi
 } from '@api';
-import { setCookie } from '../../utils/cookie';
+import { setCookie, deleteCookie } from '../../utils/cookie';
 
 export const getUser = createAsyncThunk(
   'user/getUser',
@@ -60,6 +60,7 @@ export const logoutUser = createAsyncThunk(
     try {
       await logoutApi();
       localStorage.removeItem('refreshToken');
+      deleteCookie('accessToken');
       return;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Ошибка выхода');
