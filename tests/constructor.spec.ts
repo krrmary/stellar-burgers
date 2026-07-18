@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import * as path from 'path';
 
 const APP_URL = 'http://localhost:4000';
+
 // Валидный JWT токен
 const MOCK_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IlRlc3QgVXNlciIsImlhdCI6MTUxNjIzOTAyMn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
@@ -19,54 +20,17 @@ test.describe('Тесты страницы конструктора бургер
         secure: false
       }
     ]);
-
     await page.addInitScript((token) => {
       localStorage.setItem('accessToken', token);
       localStorage.setItem('refreshToken', token);
     }, MOCK_TOKEN);
 
-    // 2. Перехват HAR-файла
+    // 2. Перехват всех запросов к бэкенду через HAR-файл
     const harPath = path.join(__dirname, 'hars/api-mocks.har');
     await page.routeFromHAR(harPath, {
       url: /.*\/api\/.*/,
       update: false,
       notFound: 'fallback'
-    });
-
-    // 3.Переопределяем HAR для ключевых эндпоинтов до загрузки страницы
-    await page.route(/.*\/api\/auth\/user.*/, async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          user: { email: 'test@test.ru', name: 'Test User' }
-        })
-      });
-    });
-
-    await page.route(/.*\/api\/auth\/token.*/, async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          accessToken: MOCK_TOKEN,
-          refreshToken: MOCK_TOKEN
-        })
-      });
-    });
-
-    await page.route(/.*\/api\/orders.*/, async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          name: 'Флюоресцентный люминесцентный бургер',
-          order: { number: 12345 }
-        })
-      });
     });
   });
 
@@ -77,6 +41,8 @@ test.describe('Тесты страницы конструктора бургер
     await expect(page.getByText('Краторная булка N-200i')).toBeVisible({
       timeout: 15000
     });
+
+    await expect(page.locator('.constructor-element')).toHaveCount(0);
 
     await page
       .locator('li')
@@ -110,16 +76,25 @@ test.describe('Тесты страницы конструктора бургер
       timeout: 15000
     });
 
+    await expect(
+      page
+        .locator('#modals')
+        .getByRole('heading', { name: 'Детали ингредиента' })
+    ).not.toBeVisible();
+
     await page
       .locator('a[href*="/ingredients/"]')
       .filter({ hasText: 'Краторная булка N-200i' })
       .click();
+
     await expect(page).toHaveURL(/\/ingredients\//, { timeout: 5000 });
+
     await expect(
       page
         .locator('#modals')
         .getByRole('heading', { name: 'Детали ингредиента' })
     ).toBeVisible({ timeout: 5000 });
+
     await expect(
       page.locator('#modals').getByText('Краторная булка N-200i')
     ).toBeVisible({ timeout: 5000 });
@@ -137,6 +112,7 @@ test.describe('Тесты страницы конструктора бургер
       .locator('a[href*="/ingredients/"]')
       .filter({ hasText: 'Краторная булка N-200i' })
       .click();
+
     await expect(
       page
         .locator('#modals')
@@ -148,6 +124,7 @@ test.describe('Тесты страницы конструктора бургер
       .locator('button[type="button"]')
       .first()
       .click();
+
     await expect(
       page.getByRole('heading', { name: 'Детали ингредиента' })
     ).not.toBeVisible({ timeout: 5000 });
@@ -157,55 +134,50 @@ test.describe('Тесты страницы конструктора бургер
     page
   }) => {
     await page.goto(APP_URL);
-    // Ждем полной загрузки, чтобы моки авторизации успели отработать при старте приложения
     await page.waitForLoadState('networkidle');
     await expect(page.getByText('Краторная булка N-200i')).toBeVisible({
       timeout: 15000
     });
 
-    // Добавляем булку
     await page
       .locator('li')
       .filter({ hasText: 'Краторная булка N-200i' })
       .getByRole('button', { name: 'Добавить' })
       .click();
+
     await expect(page.locator('.constructor-element')).toHaveCount(2, {
       timeout: 5000
     });
 
-    // Переключаем на начинки
     await page.locator('text=Начинки').first().click();
     await page.waitForTimeout(800);
 
-    // Добавляем начинку
     await page
       .locator('li')
       .filter({ hasText: 'Филе Люминесцентного тетраодонтимформа' })
       .getByRole('button', { name: 'Добавить' })
       .click();
+
     await expect(page.locator('.constructor-element')).toHaveCount(3, {
       timeout: 5000
     });
 
-    // Оформляем заказ
     await page.getByRole('button', { name: 'Оформить заказ' }).click();
 
-    // Проверяем модальное окно с номером заказа
     await expect(page.locator('#modals').getByText('12345')).toBeVisible({
       timeout: 10000
     });
 
-    // Проверяем, что конструктор очистился
     await expect(page.locator('.constructor-element')).toHaveCount(0, {
       timeout: 5000
     });
 
-    // Закрываем модальное окно
     await page
       .locator('#modals')
       .locator('button[type="button"]')
       .first()
       .click();
+
     await expect(page.locator('#modals').getByText('12345')).not.toBeVisible({
       timeout: 5000
     });
